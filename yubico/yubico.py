@@ -73,7 +73,7 @@ class Yubico():
         self.translate_otp = translate_otp
 
     def verify(self, otp, timestamp=False, sl=None, timeout=None,
-               return_response=False):
+               return_response=False, return_neg_response=False):
         """
         Returns True is the provided OTP is valid,
         False if the REPLAYED_OTP status value is returned or the response
@@ -101,8 +101,8 @@ class Yubico():
                 if not thread.is_alive() and thread.response:
                     status = self.verify_response(thread.response,
                                                   otp.otp, nonce,
-                                                  return_response)
-
+                                                  return_response,
+                                                  return_neg_response)
                     if status:
                         if return_response:
                             return status
@@ -156,7 +156,7 @@ class Yubico():
 
         return True
 
-    def verify_response(self, response, otp, nonce, return_response=False):
+    def verify_response(self, response, otp, nonce, return_response=False, return_neg_response=False):
         """
         Returns True if the OTP is valid (status=OK) and return_response=False,
         otherwise (return_response = True) it returns the server response as a
@@ -205,10 +205,17 @@ class Yubico():
                 return param_dict
             else:
                 return True
-        elif status == 'NO_SUCH_CLIENT':
-            raise InvalidClientIdError(self.client_id)
-        elif status == 'REPLAYED_OTP':
-            raise StatusCodeError(status)
+        else:
+            if return_neg_response:
+                query_string = self.parse_parameters_from_response(response)[1]
+                response = self.get_parameters_as_dictionary(query_string)
+
+                return response
+            else:
+                if status == 'NO_SUCH_CLIENT':
+                    raise InvalidClientIdError(self.client_id)
+                elif status == 'REPLAYED_OTP':
+                    raise StatusCodeError(status)
 
         return False
 
